@@ -296,15 +296,20 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 .turn {
   margin-bottom: 24px;
   opacity: 0.15;
-  transition: opacity 0.4s, border-color 0.4s, box-shadow 0.4s;
-  border-left: 3px solid transparent;
-  padding-left: 12px;
+  transition: opacity 0.4s;
 }
 .turn.visible { opacity: 0.3; }
-.turn.visible.active {
-  opacity: 1;
+.turn.visible.active { opacity: 1; }
+
+/* Active block glow indicator */
+.user-msg, .block-wrapper, .thinking-block, .tool-block, .tool-group {
+  border-left: 3px solid transparent;
+  padding-left: 8px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.active-block {
   border-left-color: var(--accent);
-  box-shadow: -4px 0 12px color-mix(in srgb, var(--accent) 40%, transparent);
+  box-shadow: -4px 0 10px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 /* User message */
@@ -1099,7 +1104,12 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
       }
     });
 
+    // Move glow to the current block only
+    document.querySelectorAll(".active-block").forEach(el => el.classList.remove("active-block"));
     if (allBlocks[idx]) {
+      const blockEl = allBlocks[idx].el;
+      // For tool blocks inside a group, glow the individual tool block
+      blockEl.classList.add("active-block");
       allBlocks[idx].el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
