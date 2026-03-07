@@ -103,6 +103,7 @@ export function render(turns, opts = {}) {
   // Session metadata — URI-encode to safely embed in JS string
   const metaJson = meta ? encodeURIComponent(JSON.stringify({
     title: redact ? redactSecrets(meta.title) : meta.title,
+    session_id: meta.session_id,
     connection_name: meta.connection_name,
     working_directory: meta.working_directory,
     created_at: meta.created_at,

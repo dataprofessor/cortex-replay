@@ -27,7 +27,7 @@ body {
 
 /* Session header */
 .session-header {
-  padding: 12px 16px;
+  padding: 12px 48px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-surface);
   position: sticky;
@@ -55,10 +55,8 @@ body {
 .controls {
   position: fixed;
   bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
   width: 100%;
-  max-width: 960px;
   z-index: 100;
   background: var(--bg-surface);
   border-top: 1px solid var(--border);
@@ -93,6 +91,7 @@ body {
 }
 .controls button:hover { background: var(--border); }
 #btn-play { width: 36px; }
+#btn-prev-turn, #btn-next-turn { font-size: 12px; opacity: 0.8; }
 .controls button.active { background: var(--accent-dim); border-color: var(--accent); }
 
 .bar-title {
@@ -114,7 +113,7 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px 8px;
+  padding: 0 36px 8px;
 }
 
 .progress-bar {
@@ -140,6 +139,27 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   background: var(--accent);
   border-radius: 2px;
   transition: width 0.2s;
+}
+.progress-segments {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  gap: 1px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-segment {
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-hover);
+}
+.segment-fill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.2s;
+  border-radius: 0;
 }
 .progress-tooltip {
   position: absolute;
@@ -229,12 +249,15 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 .filter-popover label:hover { color: var(--text); }
 .filter-popover input[type="checkbox"] { accent-color: var(--accent); }
 
+#btn-prev-turn { margin-left: 36px; }
+
 .controls-secondary {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
   justify-content: center;
+  margin-right: 36px;
 }
 
 /* More menu */
@@ -306,10 +329,6 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   border-left: 3px solid transparent;
   padding-left: 8px;
   transition: border-color 0.3s, box-shadow 0.3s;
-}
-.active-block {
-  border-left-color: var(--accent);
-  box-shadow: -4px 0 10px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 /* User message */
@@ -457,6 +476,7 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 /* Tool call */
 .tool-block {
   margin: 6px 0;
+  margin-left: 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--tool-bg);
@@ -541,6 +561,7 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 /* Tool groups (consecutive tool calls) */
 .tool-group {
   margin: 6px 0;
+  margin-left: 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--tool-bg);
@@ -568,12 +589,15 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   border-radius: 0;
   border-bottom: 1px solid var(--border);
   margin: 0;
+  border-left: none;
+  padding-left: 0;
 }
 .tool-group .tool-block:last-child { border-bottom: none; }
 
 /* Thinking blocks */
 .thinking-block {
   margin: 6px 0;
+  margin-left: 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--thinking-bg);
@@ -655,16 +679,17 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 </style>
 </head>
 <body>
+
+<div class="session-header" id="session-header" style="display:none">
+  <div class="session-title" id="session-title"></div>
+  <div class="session-meta" id="session-meta"></div>
+</div>
+
 <div class="container">
-
-  <div class="session-header" id="session-header" style="display:none">
-    <div class="session-title" id="session-title"></div>
-    <div class="session-meta" id="session-meta"></div>
-  </div>
-
   <div class="transcript" id="transcript"></div>
+</div>
 
-  <div class="controls">
+<div class="controls">
     <div class="progress-wrap">
       <div class="progress-bar" id="progress-bar">
         <div class="progress-fill" id="progress-fill" style="width:0%"></div>
@@ -673,9 +698,11 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
       <span class="progress-text" id="progress-text">0:00 / 0:00</span>
     </div>
     <div class="controls-row">
-      <button id="btn-prev" title="Previous (Left arrow)">&#x25C0;</button>
+      <button id="btn-prev-turn" title="Previous Turn (Shift+Left)">&#x23EE;</button>
+      <button id="btn-prev" title="Previous Step (Left arrow)">&#x25C0;</button>
       <button id="btn-play" title="Play/Pause (Space)">&#x25B6;</button>
-      <button id="btn-next" title="Next (Right arrow)">&#x25B6;</button>
+      <button id="btn-next" title="Next Step (Right arrow)">&#x25B6;</button>
+      <button id="btn-next-turn" title="Next Turn (Shift+Right)">&#x23ED;</button>
 
       <span class="bar-title" id="bar-title">/*PAGE_TITLE*/</span>
 
@@ -723,7 +750,6 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
       </div>
     </div>
   </div>
-</div>
 
 <script>
 (function() {
@@ -1059,6 +1085,96 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   let playing = false;
   let playTimer = null;
   let speed = /*INITIAL_SPEED*/1;
+  let turnSegments = []; // {el, fillEl, startBlock, endBlock, color}
+  let turnColorMap = {};  // turnIdx → color string
+
+  // --- Turn color palette (rainbow: purple → blue → green → yellow → red) ---
+  function turnColor(i, total) {
+    // Start at purple (270) and sweep through the full rainbow
+    const hue = (270 + (i / Math.max(total - 1, 1)) * 360) % 360;
+    return "hsl(" + hue + ", 65%, 55%)";
+  }
+
+  function turnColorFaded(i, total) {
+    const hue = (270 + (i / Math.max(total - 1, 1)) * 360) % 360;
+    return "hsla(" + hue + ", 40%, 35%, 0.6)";
+  }
+
+  function turnColorMid(i, total) {
+    const hue = (270 + (i / Math.max(total - 1, 1)) * 360) % 360;
+    return "hsla(" + hue + ", 50%, 45%, 0.8)";
+  }
+
+  function turnColorGlow(i, total) {
+    const hue = (270 + (i / Math.max(total - 1, 1)) * 360) % 360;
+    return "hsla(" + hue + ", 65%, 55%, 0.35)";
+  }
+
+  // --- Build segmented progress bar ---
+  function buildProgressSegments() {
+    const bar = document.getElementById("progress-bar");
+    // Hide the old single fill
+    const oldFill = document.getElementById("progress-fill");
+    if (oldFill) oldFill.style.display = "none";
+
+    // Count blocks per turn
+    const blocksPerTurn = {};
+    for (const b of allBlocks) {
+      blocksPerTurn[b.turnIdx] = (blocksPerTurn[b.turnIdx] || 0) + 1;
+    }
+
+    const total = allBlocks.length;
+    if (total === 0) return;
+
+    const segContainer = document.createElement("div");
+    segContainer.className = "progress-segments";
+
+    const turnIndices = Object.keys(blocksPerTurn).map(Number).sort((a, b) => a - b);
+    const turnCount = turnIndices.length;
+    let blockOffset = 0;
+
+    for (let si = 0; si < turnIndices.length; si++) {
+      const ti = turnIndices[si];
+      const count = blocksPerTurn[ti];
+      const pct = (count / total) * 100;
+      const color = turnColor(si, turnCount);
+
+      const seg = document.createElement("div");
+      seg.className = "progress-segment";
+      seg.style.width = pct + "%";
+
+      const fill = document.createElement("div");
+      fill.className = "segment-fill";
+      fill.style.background = color;
+      seg.appendChild(fill);
+
+      segContainer.appendChild(seg);
+      turnSegments.push({
+        el: seg,
+        fillEl: fill,
+        startBlock: blockOffset,
+        endBlock: blockOffset + count - 1,
+        turnIdx: ti,
+        color: color,
+        blockCount: count
+      });
+
+      blockOffset += count;
+    }
+
+    bar.appendChild(segContainer);
+
+    // Build turnIdx → color lookup (with variants)
+    for (let si = 0; si < turnIndices.length; si++) {
+      const ti = turnIndices[si];
+      turnColorMap[ti] = {
+        full: turnColor(si, turnCount),
+        faded: turnColorFaded(si, turnCount),
+        mid: turnColorMid(si, turnCount),
+        glow: turnColorGlow(si, turnCount)
+      };
+    }
+  }
 
   // Session metadata
   const SESSION_META = "/*SESSION_META_JSON*/";
@@ -1106,11 +1222,53 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 
     // Move glow to the current block only
     document.querySelectorAll(".active-block").forEach(el => el.classList.remove("active-block"));
+
+    // Reset glow on all tool-group containers
+    document.querySelectorAll(".tool-group").forEach(el => {
+      el.style.borderLeftColor = "transparent";
+      el.style.boxShadow = "";
+    });
+
+    // Apply per-turn colored margin glow
+    // For inGroup blocks, we apply to the parent .tool-group instead
+    const groupsColored = new Set();
+    for (const b of allBlocks) {
+      const colors = turnColorMap[b.turnIdx];
+      const target = b.inGroup ? b.el.closest(".tool-group") : b.el;
+      if (!target) continue;
+
+      // Skip if this group was already colored (use strongest: active > past)
+      if (b.inGroup && groupsColored.has(target)) continue;
+
+      if (!colors) {
+        target.style.borderLeftColor = "transparent";
+        target.style.boxShadow = "";
+      } else if (b.turnIdx < activeTurnIdx) {
+        target.style.borderLeftColor = colors.faded;
+        target.style.boxShadow = "";
+      } else if (b.turnIdx === activeTurnIdx) {
+        target.style.borderLeftColor = colors.mid;
+        target.style.boxShadow = "";
+      } else {
+        target.style.borderLeftColor = "transparent";
+        target.style.boxShadow = "";
+      }
+      if (b.inGroup) groupsColored.add(target);
+    }
+
+    // Active block gets full glow — apply to group container if in group
     if (allBlocks[idx]) {
-      const blockEl = allBlocks[idx].el;
-      // For tool blocks inside a group, glow the individual tool block
-      blockEl.classList.add("active-block");
-      allBlocks[idx].el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const b = allBlocks[idx];
+      const glowTarget = b.inGroup ? b.el.closest(".tool-group") : b.el;
+      const colors = turnColorMap[activeTurnIdx];
+      const fullColor = colors ? colors.full : "var(--accent)";
+      const glowColor = colors ? colors.glow : "transparent";
+      if (glowTarget) {
+        glowTarget.classList.add("active-block");
+        glowTarget.style.borderLeftColor = fullColor;
+        glowTarget.style.boxShadow = "-4px 0 10px " + glowColor;
+      }
+      b.el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
     updateProgress();
@@ -1123,6 +1281,43 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 
   function stepPrev() {
     if (currentBlock > 0) goTo(currentBlock - 1);
+  }
+
+  function stepNextTurn() {
+    if (turnSegments.length === 0) return;
+    const curTurnIdx = allBlocks[currentBlock] ? allBlocks[currentBlock].turnIdx : -1;
+    for (const seg of turnSegments) {
+      if (seg.turnIdx > curTurnIdx) {
+        goTo(seg.startBlock);
+        return;
+      }
+    }
+    // Already at last turn — go to last block
+    goTo(allBlocks.length - 1);
+  }
+
+  function stepPrevTurn() {
+    if (turnSegments.length === 0) return;
+    const curTurnIdx = allBlocks[currentBlock] ? allBlocks[currentBlock].turnIdx : -1;
+    // Find the segment for the current turn
+    let curSeg = null;
+    for (const seg of turnSegments) {
+      if (seg.turnIdx === curTurnIdx) { curSeg = seg; break; }
+    }
+    // If we're past the first block of the current turn, jump to its start
+    if (curSeg && currentBlock > curSeg.startBlock) {
+      goTo(curSeg.startBlock);
+      return;
+    }
+    // Otherwise jump to the start of the previous turn
+    for (let i = turnSegments.length - 1; i >= 0; i--) {
+      if (turnSegments[i].turnIdx < curTurnIdx) {
+        goTo(turnSegments[i].startBlock);
+        return;
+      }
+    }
+    // Already at first turn — go to first block
+    goTo(0);
   }
 
   function play() {
@@ -1152,8 +1347,20 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 
   // --- Progress bar ---
   function updateProgress() {
-    const pct = allBlocks.length > 0 ? ((currentBlock + 1) / allBlocks.length) * 100 : 0;
-    document.getElementById("progress-fill").style.width = pct + "%";
+    // Update per-turn segment fills
+    const activeTurnIdx = allBlocks[currentBlock] ? allBlocks[currentBlock].turnIdx : -1;
+    for (const seg of turnSegments) {
+      if (seg.turnIdx < activeTurnIdx) {
+        seg.fillEl.style.width = "100%";
+      } else if (seg.turnIdx === activeTurnIdx) {
+        // How far within this turn's blocks
+        const posInTurn = currentBlock - seg.startBlock + 1;
+        const pct = (posInTurn / seg.blockCount) * 100;
+        seg.fillEl.style.width = pct + "%";
+      } else {
+        seg.fillEl.style.width = "0%";
+      }
+    }
 
     // Time display
     if (turns.length > 0 && turns[0].timestamp && turns[turns.length - 1].timestamp) {
@@ -1173,17 +1380,33 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
     }
   }
 
+  // Helper: map an x position on the progress bar to a block index via segments
+  function progressPctToBlock(pct) {
+    if (turnSegments.length === 0) return Math.round(pct * (allBlocks.length - 1));
+    // Walk segments to find which one the pct falls into
+    let cumWidth = 0;
+    for (const seg of turnSegments) {
+      const segWidth = seg.blockCount / allBlocks.length;
+      if (pct <= cumWidth + segWidth) {
+        const within = (pct - cumWidth) / segWidth; // 0..1 within segment
+        const blockInSeg = Math.round(within * (seg.blockCount - 1));
+        return seg.startBlock + blockInSeg;
+      }
+      cumWidth += segWidth;
+    }
+    return allBlocks.length - 1;
+  }
+
   document.getElementById("progress-bar").addEventListener("click", (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width;
-    const idx = Math.round(pct * (allBlocks.length - 1));
-    goTo(idx);
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    goTo(progressPctToBlock(pct));
   });
 
   document.getElementById("progress-bar").addEventListener("mousemove", (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const idx = Math.round(pct * (allBlocks.length - 1));
+    const idx = progressPctToBlock(pct);
     const tooltip = document.getElementById("progress-tooltip");
     tooltip.style.left = (pct * 100) + "%";
     if (allBlocks[idx]) {
@@ -1236,10 +1459,18 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   document.getElementById("btn-play").onclick = togglePlay;
   document.getElementById("btn-next").onclick = stepNext;
   document.getElementById("btn-prev").onclick = stepPrev;
+  document.getElementById("btn-next-turn").onclick = stepNextTurn;
+  document.getElementById("btn-prev-turn").onclick = stepPrevTurn;
 
   // --- Keyboard ---
   document.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
+    if (e.shiftKey) {
+      switch (e.key) {
+        case "ArrowRight": e.preventDefault(); stepNextTurn(); return;
+        case "ArrowLeft": e.preventDefault(); stepPrevTurn(); return;
+      }
+    }
     switch (e.key) {
       case " ": case "k": case "K": e.preventDefault(); togglePlay(); break;
       case "ArrowRight": case "l": case "L": e.preventDefault(); stepNext(); break;
@@ -1265,6 +1496,7 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
         document.getElementById("session-header").style.display = "";
         document.getElementById("session-title").textContent = meta.title;
         const metaParts = [];
+        if (meta.session_id) metaParts.push("Session: " + meta.session_id);
         if (meta.connection_name) metaParts.push("Connection: " + meta.connection_name);
         if (meta.working_directory) metaParts.push("Dir: " + meta.working_directory);
         if (meta.created_at) metaParts.push(new Date(meta.created_at).toLocaleString());
@@ -1292,6 +1524,7 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 
     // Build transcript
     allBlocks = buildTranscript(turns, bookmarks);
+    buildProgressSegments();
     syncFilters();
     setSpeed(speed);
 
