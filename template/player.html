@@ -295,11 +295,17 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 
 .turn {
   margin-bottom: 24px;
-  opacity: 0.25;
-  transition: opacity 0.4s;
+  opacity: 0.15;
+  transition: opacity 0.4s, border-color 0.4s, box-shadow 0.4s;
+  border-left: 3px solid transparent;
+  padding-left: 12px;
 }
-.turn.visible { opacity: 0.35; }
-.turn.visible.active { opacity: 1; }
+.turn.visible { opacity: 0.3; }
+.turn.visible.active {
+  opacity: 1;
+  border-left-color: var(--accent);
+  box-shadow: -4px 0 12px color-mix(in srgb, var(--accent) 40%, transparent);
+}
 
 /* User message */
 .user-msg { margin-bottom: 8px; }
@@ -1081,13 +1087,19 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
     if (idx >= allBlocks.length) idx = allBlocks.length - 1;
     currentBlock = idx;
 
-    // Mark turns visible/active
-    document.querySelectorAll(".turn").forEach(el => {
-      el.classList.remove("active");
-      el.classList.add("visible");
+    const activeTurnIdx = allBlocks[idx] ? allBlocks[idx].turnIdx : -1;
+
+    // Mark turns: visible (past), active (current), hidden (future)
+    document.querySelectorAll(".turn").forEach((el, i) => {
+      el.classList.remove("active", "visible");
+      if (i < activeTurnIdx) {
+        el.classList.add("visible");
+      } else if (i === activeTurnIdx) {
+        el.classList.add("visible", "active");
+      }
     });
+
     if (allBlocks[idx]) {
-      allBlocks[idx].turnEl.classList.add("active");
       allBlocks[idx].el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
