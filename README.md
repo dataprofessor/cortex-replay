@@ -38,6 +38,69 @@ open replay.html
 npx github:dataprofessor/cortex-replay --last -o replay.html
 ```
 
+## Generating a Replay
+
+Every Cortex Code session is automatically saved as a JSON file at `~/.snowflake/cortex/conversations/`. Each file contains the full conversation history — your prompts, assistant responses, tool calls, and results. cortex-replay reads these files and produces a single HTML file you can open in any browser.
+
+### Step 1: Find your session
+
+List all available sessions to see IDs, titles, and timestamps:
+
+```bash
+cortex-replay --list-sessions
+```
+
+Output looks like:
+
+```
+  ID        Title                              Date
+  151d54c7  Build cortex-replay tool            2026-03-07 14:23
+  a3f8e012  Debug pipeline errors               2026-03-06 09:15
+  ...
+```
+
+Or skip this step entirely and grab the most recent session with `--last`.
+
+### Step 2: Generate the HTML
+
+```bash
+# Most recent session
+cortex-replay --last -o replay.html
+
+# By session ID (partial match works)
+cortex-replay 151d54c7 -o replay.html
+
+# By file path (if you have the JSON file directly)
+cortex-replay ~/.snowflake/cortex/conversations/151d54c7-xxxx.json -o replay.html
+```
+
+### Step 3: Open it
+
+```bash
+open replay.html        # macOS
+xdg-open replay.html    # Linux
+start replay.html       # Windows
+```
+
+The HTML file is fully self-contained — no server, no internet connection, no dependencies. Share it as an email attachment, drop it into a docs site, or commit it to a repo.
+
+### Customizing the output
+
+You can trim, theme, and annotate the replay in a single command:
+
+```bash
+cortex-replay --last \
+  --turns 3-15 \
+  --theme tokyo-night \
+  --speed 2 \
+  --no-thinking \
+  --mark "3:Setup" \
+  --mark "8:Fix bug" \
+  -o replay.html
+```
+
+This generates a replay of turns 3 through 15, using the tokyo-night theme at 2x default speed, with thinking blocks hidden and chapter bookmarks at turns 3 and 8.
+
 ## Usage
 
 ```
