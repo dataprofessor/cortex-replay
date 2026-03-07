@@ -1195,13 +1195,9 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   chkToolsM.onchange = () => { chkTools.checked = chkToolsM.checked; syncFilters(); };
 
   // --- Navigation ---
-  function goTo(idx) {
-    if (idx < 0) idx = 0;
-    if (idx >= allBlocks.length) idx = allBlocks.length - 1;
-    currentBlock = idx;
+  let programmaticScroll = false;
 
-    const activeTurnIdx = allBlocks[idx] ? allBlocks[idx].turnIdx : -1;
-
+  function applyTurnHighlight(activeTurnIdx) {
     // Mark turns: visible (past), active (current), hidden (future)
     document.querySelectorAll(".turn").forEach((el, i) => {
       el.classList.remove("active", "visible");
@@ -1233,10 +1229,30 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
         el.style.boxShadow = "";
       }
     });
+  }
+
+  function scrollToTurn(turnIdx) {
+    // Lightweight highlight update triggered by scroll — no scrollIntoView
+    const seg = turnSegments.find(s => s.turnIdx === turnIdx);
+    if (!seg) return;
+    currentBlock = seg.startBlock;
+    applyTurnHighlight(turnIdx);
+    updateProgress();
+  }
+
+  function goTo(idx) {
+    if (idx < 0) idx = 0;
+    if (idx >= allBlocks.length) idx = allBlocks.length - 1;
+    currentBlock = idx;
+
+    const activeTurnIdx = allBlocks[idx] ? allBlocks[idx].turnIdx : -1;
+    applyTurnHighlight(activeTurnIdx);
 
     // Scroll active block into view
     if (allBlocks[idx]) {
+      programmaticScroll = true;
       allBlocks[idx].el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => { programmaticScroll = false; }, 800);
     }
 
     updateProgress();
@@ -1483,6 +1499,46 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
     buildProgressSegments();
     syncFilters();
     setSpeed(speed);
+
+    // --- Scroll-based turn detection ---
+    const turnEls = document.querySelectorAll(".turn");
+    if (turnEls.length > 0) {
+      let scrollTick = false;
+      window.addEventListener("scroll", () => {
+        if (scrollTick || programmaticScroll || playing) return;
+        scrollTick = true;
+        requestAnimationFrame(() => {
+          scrollTick = false;
+          const vpMid = window.innerHeight / 2;
+          let best = -1;
+          let bestDist = Infinity;
+          turnEls.forEach((el, i) => {
+            const rect = el.getBoundingClientRect();
+            // If this turn spans the viewport center, it wins immediately
+            if (rect.top <= vpMid && rect.bottom >= vpMid) {
+              best = i;
+              bestDist = -1; // sentinel: exact hit
+              return;
+            }
+            // Otherwise find closest turn above viewport center (just scrolled past)
+            if (bestDist === -1) return; // already have an exact hit
+            if (rect.bottom <= vpMid) {
+              const dist = vpMid - rect.bottom;
+              if (dist < bestDist) { bestDist = dist; best = i; }
+            }
+            // Or closest turn below viewport center (scrolling up)
+            if (rect.top > vpMid) {
+              const dist = rect.top - vpMid;
+              if (dist < bestDist) { bestDist = dist; best = i; }
+            }
+          });
+          const curTurnIdx = allBlocks[currentBlock] ? allBlocks[currentBlock].turnIdx : -1;
+          if (best !== -1 && best !== curTurnIdx) {
+            scrollToTurn(best);
+          }
+        });
+      }, { passive: true });
+    }
 
     // Start at first block
     if (allBlocks.length > 0) goTo(0);
