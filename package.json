@@ -1,0 +1,38 @@
+{
+  "name": "cortex-replay",
+  "version": "0.1.0",
+  "description": "Convert Cortex Code session transcripts into self-contained, embeddable HTML replays",
+  "type": "module",
+  "bin": {
+    "cortex-replay": "bin/cortex-replay.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "template/"
+  ],
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cortex",
+    "cortex-code",
+    "snowflake",
+    "replay",
+    "transcript",
+    "html"
+  ],
+  "author": "Chanin Nantasenamat (https://github.com/dataprofessor)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dataprofessor/cortex-replay"
+  },
+  "homepage": "https://github.com/dataprofessor/cortex-replay#readme",
+  "bugs": {
+    "url": "https://github.com/dataprofessor/cortex-replay/issues"
+  },
+  "license": "MIT"
+}
