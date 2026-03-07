@@ -53,10 +53,14 @@ cortex-replay --list-sessions
 Output looks like:
 
 ```
-  ID        Title                              Date
-  151d54c7  Build cortex-replay tool            2026-03-07 14:23
-  a3f8e012  Debug pipeline errors               2026-03-06 09:15
-  ...
+ID            Title                                               Last Updated          Turns
+----------------------------------------------------------------------------------------------
+55c1badd-f58  Implementing Claude-Replay-Style Session Record...  2026-03-07T04:19:31.  87
+87047435-087  Chat for session: 87047435-087f-42fe-a983-afdbe...  2026-03-07T03:09:26.  9
+332c040a-9c8  New coding session                                  2026-03-05T02:07:03.  14
+6868f059-3b8  teach me cortex agent                               2026-03-05T01:49:56.  85
+41ac248c-c8c  Generate realistic looking synthetic data in da...  2026-02-27T21:17:24.  42
+...
 ```
 
 Or skip this step entirely and grab the most recent session with `--last`.
