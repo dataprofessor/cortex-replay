@@ -91,7 +91,6 @@ body {
 }
 .controls button:hover { background: var(--border); }
 #btn-play { width: 36px; }
-#btn-prev-turn, #btn-next-turn { font-size: 12px; opacity: 0.8; }
 .controls button.active { background: var(--accent-dim); border-color: var(--accent); }
 
 .bar-title {
@@ -319,17 +318,12 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 .turn {
   margin-bottom: 24px;
   opacity: 0.15;
-  transition: opacity 0.4s;
+  transition: opacity 0.4s, border-color 0.3s, box-shadow 0.3s;
+  border-left: 3px solid transparent;
+  padding-left: 8px;
 }
 .turn.visible { opacity: 0.3; }
 .turn.visible.active { opacity: 1; }
-
-/* Active block glow indicator */
-.user-msg, .block-wrapper, .thinking-block, .tool-block, .tool-group {
-  border-left: 3px solid transparent;
-  padding-left: 8px;
-  transition: border-color 0.3s, box-shadow 0.3s;
-}
 
 /* User message */
 .user-msg { margin-bottom: 8px; }
@@ -589,8 +583,6 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   border-radius: 0;
   border-bottom: 1px solid var(--border);
   margin: 0;
-  border-left: none;
-  padding-left: 0;
 }
 .tool-group .tool-block:last-child { border-bottom: none; }
 
@@ -698,11 +690,9 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
       <span class="progress-text" id="progress-text">0:00 / 0:00</span>
     </div>
     <div class="controls-row">
-      <button id="btn-prev-turn" title="Previous Turn (Shift+Left)">&#x23EE;</button>
-      <button id="btn-prev" title="Previous Step (Left arrow)">&#x25C0;</button>
+      <button id="btn-prev-turn" title="Previous Turn (Left arrow)">&#x23EE;</button>
       <button id="btn-play" title="Play/Pause (Space)">&#x25B6;</button>
-      <button id="btn-next" title="Next Step (Right arrow)">&#x25B6;</button>
-      <button id="btn-next-turn" title="Next Turn (Shift+Right)">&#x23ED;</button>
+      <button id="btn-next-turn" title="Next Turn (Right arrow)">&#x23ED;</button>
 
       <span class="bar-title" id="bar-title">/*PAGE_TITLE*/</span>
 
@@ -1223,52 +1213,28 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
     // Move glow to the current block only
     document.querySelectorAll(".active-block").forEach(el => el.classList.remove("active-block"));
 
-    // Reset glow on all tool-group containers
-    document.querySelectorAll(".tool-group").forEach(el => {
-      el.style.borderLeftColor = "transparent";
-      el.style.boxShadow = "";
+    // Apply per-turn colored margin bar to .turn elements
+    document.querySelectorAll(".turn").forEach((el, i) => {
+      const colors = turnColorMap[i];
+      if (!colors) {
+        el.style.borderLeftColor = "transparent";
+        el.style.boxShadow = "";
+      } else if (i < activeTurnIdx) {
+        el.style.borderLeftColor = colors.faded;
+        el.style.boxShadow = "";
+      } else if (i === activeTurnIdx) {
+        el.classList.add("active-block");
+        el.style.borderLeftColor = colors.full;
+        el.style.boxShadow = "-4px 0 10px " + colors.glow;
+      } else {
+        el.style.borderLeftColor = "transparent";
+        el.style.boxShadow = "";
+      }
     });
 
-    // Apply per-turn colored margin glow
-    // For inGroup blocks, we apply to the parent .tool-group instead
-    const groupsColored = new Set();
-    for (const b of allBlocks) {
-      const colors = turnColorMap[b.turnIdx];
-      const target = b.inGroup ? b.el.closest(".tool-group") : b.el;
-      if (!target) continue;
-
-      // Skip if this group was already colored (use strongest: active > past)
-      if (b.inGroup && groupsColored.has(target)) continue;
-
-      if (!colors) {
-        target.style.borderLeftColor = "transparent";
-        target.style.boxShadow = "";
-      } else if (b.turnIdx < activeTurnIdx) {
-        target.style.borderLeftColor = colors.faded;
-        target.style.boxShadow = "";
-      } else if (b.turnIdx === activeTurnIdx) {
-        target.style.borderLeftColor = colors.mid;
-        target.style.boxShadow = "";
-      } else {
-        target.style.borderLeftColor = "transparent";
-        target.style.boxShadow = "";
-      }
-      if (b.inGroup) groupsColored.add(target);
-    }
-
-    // Active block gets full glow — apply to group container if in group
+    // Scroll active block into view
     if (allBlocks[idx]) {
-      const b = allBlocks[idx];
-      const glowTarget = b.inGroup ? b.el.closest(".tool-group") : b.el;
-      const colors = turnColorMap[activeTurnIdx];
-      const fullColor = colors ? colors.full : "var(--accent)";
-      const glowColor = colors ? colors.glow : "transparent";
-      if (glowTarget) {
-        glowTarget.classList.add("active-block");
-        glowTarget.style.borderLeftColor = fullColor;
-        glowTarget.style.boxShadow = "-4px 0 10px " + glowColor;
-      }
-      b.el.scrollIntoView({ behavior: "smooth", block: "center" });
+      allBlocks[idx].el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
     updateProgress();
@@ -1277,10 +1243,6 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   function stepNext() {
     if (currentBlock < allBlocks.length - 1) goTo(currentBlock + 1);
     else stop();
-  }
-
-  function stepPrev() {
-    if (currentBlock > 0) goTo(currentBlock - 1);
   }
 
   function stepNextTurn() {
@@ -1457,24 +1419,16 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 
   // --- Buttons ---
   document.getElementById("btn-play").onclick = togglePlay;
-  document.getElementById("btn-next").onclick = stepNext;
-  document.getElementById("btn-prev").onclick = stepPrev;
   document.getElementById("btn-next-turn").onclick = stepNextTurn;
   document.getElementById("btn-prev-turn").onclick = stepPrevTurn;
 
   // --- Keyboard ---
   document.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
-    if (e.shiftKey) {
-      switch (e.key) {
-        case "ArrowRight": e.preventDefault(); stepNextTurn(); return;
-        case "ArrowLeft": e.preventDefault(); stepPrevTurn(); return;
-      }
-    }
     switch (e.key) {
       case " ": case "k": case "K": e.preventDefault(); togglePlay(); break;
-      case "ArrowRight": case "l": case "L": e.preventDefault(); stepNext(); break;
-      case "ArrowLeft": case "h": case "H": e.preventDefault(); stepPrev(); break;
+      case "ArrowRight": case "l": case "L": e.preventDefault(); stepNextTurn(); break;
+      case "ArrowLeft": case "h": case "H": e.preventDefault(); stepPrevTurn(); break;
     }
   });
 
