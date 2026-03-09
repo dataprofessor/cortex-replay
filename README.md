@@ -6,6 +6,8 @@ Cortex Code stores full conversation transcripts as JSON files. cortex-replay tu
 
 Adapted from [claude-replay](https://github.com/es617/claude-replay) (MIT) for Cortex Code's session format.
 
+<img src="cortex-replay-screencast.gif" alt="Cortex Replay Screencast">
+
 ## Getting Started
 
 **Requirements:** Node.js 18+
