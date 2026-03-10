@@ -6,6 +6,8 @@ Cortex Code stores full conversation transcripts as JSON files. cortex-replay tu
 
 Adapted from [claude-replay](https://github.com/es617/claude-replay) (MIT) for Cortex Code's session format.
 
+**[Live Demo](https://dataprofessor.github.io/cortex-replay/)**
+
 <img src="screencast.gif" alt="Cortex Replay Screencast">
 
 ## Getting Started
@@ -137,6 +139,14 @@ cortex-replay --list-sessions
 | `--list-themes` | List available themes and exit |
 
 ### Examples
+
+See a live example at **[dataprofessor.github.io/cortex-replay](https://dataprofessor.github.io/cortex-replay/)** — an interactive replay of a Cortex Code session generated with:
+
+```bash
+cortex-replay e83fdbc6 --title "Building cortex-replay" --theme snowflake -o replay.html
+```
+
+More examples:
 
 ```bash
 # Replay turns 3 through 10 at 2x speed
