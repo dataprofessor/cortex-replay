@@ -18,7 +18,7 @@ export const SECRET_PATTERNS = [
   // Anthropic API keys
   { name: "sk_ant_key", pattern: /sk-ant-[a-zA-Z0-9-]{20,}/g },
   // Generic sk- / key- prefixed secrets
-  { name: "sk_key", pattern: /sk-[a-zA-Z0-9]{20,}/g },
+  { name: "sk_key", pattern: /sk-[a-zA-Z0-9-]{20,}/g },
   { name: "key_prefix", pattern: /key-[a-zA-Z0-9]{20,}/g },
   // Bearer tokens
   { name: "bearer", pattern: /Bearer [A-Za-z0-9_.~+/=-]{20,}/g },
