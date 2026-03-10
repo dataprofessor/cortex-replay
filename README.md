@@ -8,7 +8,7 @@ Adapted from [claude-replay](https://github.com/es617/claude-replay) (MIT) for C
 
 **[Live Demo](https://dataprofessor.github.io/cortex-replay/)**
 
-<img src="screencast.gif" alt="Cortex Replay Screencast">
+<a href="https://dataprofessor.github.io/cortex-replay/"><img src="screencast.gif" alt="Cortex Replay Screencast"></a>
 
 ## Getting Started
 
@@ -59,7 +59,6 @@ Output looks like:
 ```
 ID            Title                                               Last Updated          Turns
 ----------------------------------------------------------------------------------------------
-55c1badd-f58  Implementing Claude-Replay-Style Session Record...  2026-03-07T04:19:31.  87
 87047435-087  Chat for session: 87047435-087f-42fe-a983-afdbe...  2026-03-07T03:09:26.  9
 332c040a-9c8  New coding session                                  2026-03-05T02:07:03.  14
 6868f059-3b8  teach me cortex agent                               2026-03-05T01:49:56.  85
