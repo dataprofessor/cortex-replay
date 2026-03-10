@@ -128,6 +128,7 @@ cortex-replay --list-sessions
 | `--from TIMESTAMP` | Start time filter (ISO 8601) |
 | `--to TIMESTAMP` | End time filter (ISO 8601) |
 | `--speed N` | Initial playback speed (default: 1.0) |
+| `--title TEXT` | Page title (default: from session title) |
 | `--no-thinking` | Hide thinking blocks by default |
 | `--no-tool-calls` | Hide tool call blocks by default |
 | `--no-redact` | Disable automatic secret redaction |
@@ -135,7 +136,10 @@ cortex-replay --list-sessions
 | `--theme-file FILE` | Custom theme JSON file |
 | `--mark "N:Label"` | Add a bookmark at turn N (repeatable) |
 | `--bookmarks FILE` | JSON file with bookmarks `[{turn, label}]` |
-| `--list-themes` | List available themes and exit |
+| `--user-label NAME` | Label for user messages (default: User) |
+| `--assistant-label NAME` | Label for assistant messages (default: Cortex Code) |
+| `--no-compress` | Embed raw JSON instead of compressed |
+| `--list-themes` | List available built-in themes and exit |
 
 ### Examples
 
