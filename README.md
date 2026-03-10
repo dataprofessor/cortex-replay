@@ -8,7 +8,7 @@ Adapted from [claude-replay](https://github.com/es617/claude-replay) (MIT) for C
 
 **[Live Demo](https://dataprofessor.github.io/cortex-replay/)**
 
-<img src="screencast.gif" href="https://dataprofessor.github.io/cortex-replay/" alt="Cortex Replay Screencast">
+<img src="screencast.gif" alt="Cortex Replay Screencast">
 
 ## Getting Started
 
