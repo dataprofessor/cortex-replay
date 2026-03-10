@@ -146,7 +146,7 @@ cortex-replay --list-sessions
 See a live example at **[dataprofessor.github.io/cortex-replay](https://dataprofessor.github.io/cortex-replay/)** — an interactive replay of a Cortex Code session generated with:
 
 ```bash
-cortex-replay e83fdbc6 --title "Building cortex-replay" --theme snowflake -o replay.html
+cortex-replay 6868f059-3b8 --title "Building cortex-replay" --theme snowflake -o replay.html
 ```
 
 More examples:
