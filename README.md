@@ -30,7 +30,7 @@ cortex-replay --list-sessions
 cortex-replay --last -o replay.html
 
 # Replay a specific session (partial ID match works)
-cortex-replay 151d54c7 -o replay.html
+cortex-replay 6868f059-3b8 -o replay.html
 
 # Open it
 open replay.html
@@ -75,10 +75,10 @@ Or skip this step entirely and grab the most recent session with `--last`.
 cortex-replay --last -o replay.html
 
 # By session ID (partial match works)
-cortex-replay 151d54c7 -o replay.html
+cortex-replay 6868f059-3b8 -o replay.html
 
 # By file path (if you have the JSON file directly)
-cortex-replay ~/.snowflake/cortex/conversations/151d54c7-xxxx.json -o replay.html
+cortex-replay ~/.snowflake/cortex/conversations/6868f059-3b8a-423d-8a51-ef0397c7f469.json -o replay.html
 ```
 
 ### Step 3: Open it
