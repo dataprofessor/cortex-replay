@@ -69,7 +69,7 @@ function turnsToJsonData(turns, { redact = true } = {}) {
 /**
  * Render turns into a self-contained HTML string.
  * @param {import('./parser.mjs').Turn[]} turns
- * @param {{ speed?: number, showThinking?: boolean, showToolCalls?: boolean, theme?: Record<string,string>, userLabel?: string, assistantLabel?: string, title?: string, redactSecrets?: boolean, bookmarks?: Array, compress?: boolean, meta?: import('./parser.mjs').SessionMeta }} opts
+ * @param {{ speed?: number, showThinking?: boolean, showToolCalls?: boolean, theme?: Record<string,string>, userLabel?: string, assistantLabel?: string, title?: string, redactSecrets?: boolean, bookmarks?: Array, compress?: boolean, meta?: import('./parser.mjs').SessionMeta, animate?: boolean }} opts
  * @returns {string}
  */
 export function render(turns, opts = {}) {
@@ -84,6 +84,7 @@ export function render(turns, opts = {}) {
     redactSecrets: redact = true,
     bookmarks = [],
     meta = null,
+    animate = true,
   } = opts;
 
   const speed = Number.isFinite(rawSpeed) ? Math.max(0.1, Math.min(rawSpeed, 10)) : 1.0;
@@ -99,6 +100,7 @@ export function render(turns, opts = {}) {
   html = html.replaceAll("/*PAGE_TITLE*/", escapeHtml(title));
   html = html.replace("/*USER_LABEL*/", escapeHtml(userLabel));
   html = html.replace("/*ASSISTANT_LABEL*/", escapeHtml(assistantLabel));
+  html = html.replace("/*ANIMATE_MODE*/", animate ? "true" : "false");
 
   // Session metadata — URI-encode to safely embed in JS string
   const metaJson = meta ? encodeURIComponent(JSON.stringify({

@@ -1,6 +1,6 @@
 {
   "name": "cortex-replay",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Convert Cortex Code session transcripts into self-contained, embeddable HTML replays",
   "type": "module",
   "bin": {

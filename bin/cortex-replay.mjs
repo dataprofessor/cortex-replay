@@ -32,6 +32,7 @@ const options = {
   "assistant-label": { type: "string", default: "Cortex Code" },
   mark: { type: "string", multiple: true },
   bookmarks: { type: "string" },
+  "no-animate": { type: "boolean", default: false },
   "no-compress": { type: "boolean", default: false },
   "session-dir": { type: "string" },
   "list-sessions": { type: "boolean", default: false },
@@ -69,6 +70,7 @@ Options:
   --no-tool-calls         Hide tool call blocks by default
   --title TEXT            Page title (default: from session title)
   --no-redact             Disable secret redaction in output
+  --no-animate            Disable typewriter animation (use classic instant-reveal)
   --theme NAME            Built-in theme (default: snowflake)
   --theme-file FILE       Custom theme JSON file (overrides --theme)
   --user-label NAME       Label for user messages (default: User)
@@ -365,6 +367,7 @@ const html = render(turns, {
   bookmarks,
   compress: !values["no-compress"],
   meta,
+  animate: !values["no-animate"],
 });
 
 if (values.output) {
