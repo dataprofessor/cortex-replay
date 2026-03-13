@@ -9,6 +9,9 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+html {
+  scroll-padding-bottom: 80px;
+}
 body {
   background: var(--bg);
   color: var(--text);
@@ -315,17 +318,23 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   min-height: 100vh;
 }
 
+/* Turn visibility: hidden by default, progressively revealed */
 .turn {
   margin-bottom: 36px;
   padding-top: 12px;
   padding-bottom: 12px;
-  opacity: 0.15;
-  transition: opacity 0.4s, border-color 0.3s, box-shadow 0.3s;
   border-left: 3px solid transparent;
   padding-left: 20px;
+  display: none;
 }
-.turn.visible { opacity: 0.3; }
-.turn.visible.active { opacity: 1; }
+.turn.revealed {
+  display: block;
+  opacity: 0.3;
+  transition: opacity 0.4s, border-color 0.3s, box-shadow 0.3s;
+}
+.turn.revealed.active {
+  opacity: 1;
+}
 
 /* User message */
 .user-msg { margin-bottom: 8px; }
@@ -336,6 +345,43 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 .user-text {
   color: var(--text-bright);
   word-break: break-word;
+}
+
+/* Assistant container */
+.assistant-container {
+  margin-top: 12px;
+  padding: 0;
+}
+
+/* Typewriter cursor */
+@keyframes blink-caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  background: var(--accent);
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  animation: blink-caret 0.7s step-end infinite;
+}
+
+/* Animated block reveal */
+.block-wrapper, .thinking-block, .tool-group, .tool-block {
+  transition: opacity 0.35s ease, max-height 0.35s ease;
+  overflow: hidden;
+}
+.block-hidden {
+  opacity: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  pointer-events: none;
 }
 
 /* Timestamp */
@@ -353,11 +399,16 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 }
 
 /* Assistant text */
+.assistant-header { margin-bottom: 4px; }
+.assistant-prompt {
+  color: var(--green);
+  font-weight: 600;
+}
 .assistant-text {
   color: var(--text);
   word-break: break-word;
   margin: 6px 0;
-  padding-left: 4px;
+  padding-left: 0;
   line-height: 1.6;
 }
 .assistant-text p { margin: 0.4em 0; }
@@ -630,13 +681,9 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   color: var(--text-dim);
   font-size: 12px;
   font-weight: 600;
+  display: none;
 }
-.bookmark-divider::before,
-.bookmark-divider::after {
-  content: "";
-  flex: 1;
-  border-top: 1px dashed var(--border);
-}
+.bookmark-divider.revealed { display: flex; }
 
 /* Chapter menu */
 .chapter-wrap { position: relative; }
@@ -689,7 +736,7 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
         <div class="progress-fill" id="progress-fill" style="width:0%"></div>
         <div class="progress-tooltip" id="progress-tooltip"></div>
       </div>
-      <span class="progress-text" id="progress-text">0:00 / 0:00</span>
+      <span class="progress-text" id="progress-text">0 / 0</span>
     </div>
     <div class="controls-row">
       <button id="btn-prev-turn" title="Previous Turn (Left arrow)">&#x23EE;</button>
@@ -753,6 +800,7 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   // --- Config ---
   const USER_LABEL = "/*USER_LABEL*/";
   const ASSISTANT_LABEL = "/*ASSISTANT_LABEL*/";
+  const ANIMATE_MODE = /*ANIMATE_MODE*/;
 
   // --- Decompress or parse embedded data ---
   async function decodeData(raw) {
@@ -790,12 +838,20 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
 
-    // Code blocks
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
-      '<pre><code class="lang-' + lang + '">' + code.trimEnd() + '</code></pre>');
+    // Extract code blocks and inline code FIRST to protect them from further transforms
+    const codeBlocks = [];
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+      const placeholder = '\x00CB' + codeBlocks.length + '\x00';
+      codeBlocks.push('<pre><code class="lang-' + lang + '">' + code.trimEnd() + '</code></pre>');
+      return placeholder;
+    });
 
-    // Inline code
-    html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+    const inlineCodes = [];
+    html = html.replace(/`([^`\n]+)`/g, (_, code) => {
+      const placeholder = '\x00IC' + inlineCodes.length + '\x00';
+      inlineCodes.push('<code>' + code + '</code>');
+      return placeholder;
+    });
 
     // Headers
     html = html.replace(/^######\s+(.+)$/gm, '<h6>$1</h6>');
@@ -823,7 +879,7 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
         if (ri === 1 && /^\|[\s:-]+\|$/.test(row.trim())) return; // separator
         const cells = row.split('|').filter((_, i, a) => i > 0 && i < a.length - 1);
         const tag = ri === 0 ? 'th' : 'td';
-        t += '<tr>' + cells.map(c => `<${tag}>${c.trim()}</${tag}>`).join('') + '</tr>';
+        t += '<tr>' + cells.map(c => '<' + tag + '>' + c.trim() + '</' + tag + '>').join('') + '</tr>';
       });
       t += '</table>';
       return t;
@@ -838,8 +894,16 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
     html = html.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
 
     // Paragraphs - wrap loose text in <p>
-    html = html.replace(/^(?!<[a-z/])((?!<[a-z/]).+)$/gm, '<p>$1</p>');
+    html = html.replace(/^(?!<[a-z/\x00])((?!<[a-z/\x00]).+)$/gm, '<p>$1</p>');
     html = html.replace(/<p><\/p>/g, '');
+
+    // Restore inline code and code blocks
+    inlineCodes.forEach((code, i) => {
+      html = html.replace('\x00IC' + i + '\x00', code);
+    });
+    codeBlocks.forEach((block, i) => {
+      html = html.replace('\x00CB' + i + '\x00', block);
+    });
 
     return html;
   }
@@ -910,7 +974,7 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
     const bookmarkMap = {};
     for (const b of bookmarks) bookmarkMap[b.turn] = b.label;
 
-    const allBlocks = []; // flat list of {el, turnEl, turnIdx}
+    const allBlocks = []; // flat list of {el, turnEl, turnIdx, kind}
     let currentTurnIdx = 0;
 
     for (const turn of turns) {
@@ -918,6 +982,7 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
       if (bookmarkMap[turn.index]) {
         const div = document.createElement("div");
         div.className = "bookmark-divider";
+        div.dataset.forTurn = turn.index;
         div.textContent = bookmarkMap[turn.index];
         container.appendChild(div);
       }
@@ -933,10 +998,14 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
         const ts = turn.timestamp ? formatTime(turn.timestamp) : "";
         userDiv.innerHTML =
           '<span class="user-prompt">' + escHtml(USER_LABEL) + ' </span>' +
-          (ts ? '<span class="turn-header-ts">' + escHtml(ts) + '</span>' : '') +
-          '<div class="user-text">' + renderMd(turn.user_text) + '</div>';
+          (ts ? '<span class="turn-header-ts">' + escHtml(ts) + '</span>' : '');
+        // Create user-text container separately for typewriter
+        const userTextEl = document.createElement("div");
+        userTextEl.className = "user-text";
+        userTextEl.dataset.rawText = turn.user_text;
+        userDiv.appendChild(userTextEl);
         turnEl.appendChild(userDiv);
-        allBlocks.push({ el: userDiv, turnEl, turnIdx: currentTurnIdx });
+        allBlocks.push({ el: userDiv, turnEl, turnIdx: currentTurnIdx, kind: "user", userTextEl: userTextEl, rawText: turn.user_text });
       }
 
       // System events
@@ -949,24 +1018,36 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
         }
       }
 
+      // Assistant container (separate from user message area)
+      let asstContainer = null;
+      if (turn.blocks && turn.blocks.length > 0) {
+        asstContainer = document.createElement("div");
+        asstContainer.className = "assistant-container";
+        const asstHeader = document.createElement("div");
+        asstHeader.className = "assistant-header block-hidden";
+        asstHeader.innerHTML = '<span class="assistant-prompt">' + escHtml(ASSISTANT_LABEL) + '</span>';
+        asstContainer.appendChild(asstHeader);
+        turnEl.appendChild(asstContainer);
+        allBlocks.push({ el: asstHeader, turnEl, turnIdx: currentTurnIdx, kind: "assistant-header" });
+      }
+
       // Assistant blocks
       let toolGroup = null;
       let toolGroupBlocks = [];
+      const blockTarget = asstContainer || turnEl;
 
       function flushToolGroup() {
         if (!toolGroup) return;
         if (toolGroupBlocks.length === 1) {
-          // Single tool — unwrap from group
           const single = toolGroupBlocks[0].el;
           single.style.margin = "";
           single.style.border = "";
           single.style.borderRadius = "";
-          turnEl.insertBefore(single, toolGroup);
-          turnEl.removeChild(toolGroup);
-          // Update allBlocks references
+          single.classList.add("block-hidden");
+          blockTarget.insertBefore(single, toolGroup);
+          blockTarget.removeChild(toolGroup);
           for (const tb of toolGroupBlocks) tb.el = single;
         } else {
-          // Wrap in group header
           const count = toolGroupBlocks.length;
           const header = document.createElement("div");
           header.className = "tool-group-header";
@@ -979,7 +1060,7 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
           toolGroup.insertBefore(header, toolGroup.firstChild);
           toolGroup.appendChild(body);
           header.onclick = () => toolGroup.classList.toggle("open");
-          toolGroup.classList.add("open"); // default open
+          toolGroup.classList.add("open");
         }
         toolGroup = null;
         toolGroupBlocks = [];
@@ -989,28 +1070,31 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
         if (block.kind === "text") {
           flushToolGroup();
           const div = document.createElement("div");
-          div.className = "block-wrapper";
-          div.innerHTML = '<div class="assistant-text">' + renderMd(block.text) + '</div>';
-          turnEl.appendChild(div);
-          allBlocks.push({ el: div, turnEl, turnIdx: currentTurnIdx });
+          div.className = "block-wrapper block-hidden";
+          const textDiv = document.createElement("div");
+          textDiv.className = "assistant-text";
+          textDiv.innerHTML = renderMd(block.text);
+          div.appendChild(textDiv);
+          blockTarget.appendChild(div);
+          allBlocks.push({ el: div, turnEl, turnIdx: currentTurnIdx, kind: "assistant-text", rawText: block.text, textEl: textDiv });
         } else if (block.kind === "thinking") {
           flushToolGroup();
           const div = document.createElement("div");
-          div.className = "thinking-block block-wrapper";
+          div.className = "thinking-block block-wrapper block-hidden";
           div.dataset.blockType = "thinking";
           div.innerHTML =
             '<div class="thinking-header"><span class="tool-chevron">&#x25B8;</span> Thinking</div>' +
             '<div class="thinking-body">' + renderMd(block.text) + '</div>';
           div.querySelector(".thinking-header").onclick = () => div.classList.toggle("open");
-          turnEl.appendChild(div);
-          allBlocks.push({ el: div, turnEl, turnIdx: currentTurnIdx });
+          blockTarget.appendChild(div);
+          allBlocks.push({ el: div, turnEl, turnIdx: currentTurnIdx, kind: "thinking" });
         } else if (block.kind === "tool_use") {
           const tc = block.tool_call;
           if (!toolGroup) {
             toolGroup = document.createElement("div");
-            toolGroup.className = "tool-group";
+            toolGroup.className = "tool-group block-hidden";
             toolGroup.dataset.blockType = "tool";
-            turnEl.appendChild(toolGroup);
+            blockTarget.appendChild(toolGroup);
           }
 
           const div = document.createElement("div");
@@ -1038,7 +1122,7 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
           div.querySelector(".tool-header").onclick = () => div.classList.toggle("open");
           toolGroup.appendChild(div);
           toolGroupBlocks.push({ el: div, turnEl, turnIdx: currentTurnIdx });
-          allBlocks.push({ el: div, turnEl, turnIdx: currentTurnIdx, inGroup: true });
+          allBlocks.push({ el: toolGroup, turnEl, turnIdx: currentTurnIdx, inGroup: true, kind: "tool", groupEl: toolGroup });
         }
       }
       flushToolGroup();
@@ -1077,12 +1161,21 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   let playing = false;
   let playTimer = null;
   let speed = /*INITIAL_SPEED*/1;
-  let turnSegments = []; // {el, fillEl, startBlock, endBlock, color}
-  let turnColorMap = {};  // turnIdx → color string
+  let turnSegments = [];
+  let turnColorMap = {};
 
-  // --- Turn color palette (rainbow: purple → blue → green → yellow → red) ---
+  // Animation state machine
+  const STATE_IDLE = 0;
+  const STATE_TYPING_USER = 1;
+  const STATE_REVEALING_BLOCKS = 2;
+  const STATE_PAUSING = 3;
+  const STATE_TYPING_ASSISTANT = 4;
+  let animState = STATE_IDLE;
+  let typingCancel = null; // function to cancel in-progress typing
+  let revealedUpTo = -1; // highest block index that has been fully revealed
+
+  // --- Turn color palette ---
   function turnColor(i, total) {
-    // Start at purple (270) and sweep through the full rainbow
     const hue = (270 + (i / Math.max(total - 1, 1)) * 360) % 360;
     return "hsl(" + hue + ", 65%, 55%)";
   }
@@ -1105,11 +1198,9 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   // --- Build segmented progress bar ---
   function buildProgressSegments() {
     const bar = document.getElementById("progress-bar");
-    // Hide the old single fill
     const oldFill = document.getElementById("progress-fill");
     if (oldFill) oldFill.style.display = "none";
 
-    // Count blocks per turn
     const blocksPerTurn = {};
     for (const b of allBlocks) {
       blocksPerTurn[b.turnIdx] = (blocksPerTurn[b.turnIdx] || 0) + 1;
@@ -1156,7 +1247,6 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 
     bar.appendChild(segContainer);
 
-    // Build turnIdx → color lookup (with variants)
     for (let si = 0; si < turnIndices.length; si++) {
       const ti = turnIndices[si];
       turnColorMap[ti] = {
@@ -1194,24 +1284,218 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
   chkThinkingM.onchange = () => { chkThinking.checked = chkThinkingM.checked; syncFilters(); };
   chkToolsM.onchange = () => { chkTools.checked = chkToolsM.checked; syncFilters(); };
 
-  // --- Navigation ---
-  let programmaticScroll = false;
+  // =====================================================
+  // TYPEWRITER ENGINE
+  // =====================================================
+
+  /**
+   * Type text character-by-character into an element.
+   * Returns a promise that resolves when done.
+   * The returned promise has a .cancel() method to abort.
+   */
+  function typeText(el, text, charDelay) {
+    let cancelled = false;
+    let resolvePromise;
+
+    const cursor = document.createElement("span");
+    cursor.className = "typing-cursor";
+    el.textContent = "";
+    el.appendChild(cursor);
+
+    const rendered = renderMd(text);
+    // We type the raw text then swap to rendered markdown at the end
+    const plainText = text;
+
+    const promise = new Promise((resolve) => {
+      resolvePromise = resolve;
+      let i = 0;
+
+      function typeNext() {
+        if (cancelled) {
+          // Finish instantly
+          el.innerHTML = rendered;
+          resolve();
+          return;
+        }
+        if (i < plainText.length) {
+          // Insert character before cursor
+          const charNode = document.createTextNode(plainText.charAt(i));
+          el.insertBefore(charNode, cursor);
+          i++;
+          // Auto-scroll to keep cursor visible
+          scrollToBottom();
+          playTimer = setTimeout(typeNext, charDelay);
+        } else {
+          // Done typing - swap to rendered markdown
+          if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
+          el.innerHTML = rendered;
+          resolve();
+        }
+      }
+      typeNext();
+    });
+
+    promise.cancel = () => {
+      cancelled = true;
+      if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+      el.innerHTML = rendered;
+      if (resolvePromise) resolvePromise();
+    };
+
+    return promise;
+  }
+
+  /**
+   * Progressively reveal pre-rendered HTML by walking text nodes.
+   * The element should already contain the full rendered HTML (hidden).
+   * We hide all text content, then reveal character-by-character,
+   * preserving the HTML structure (bold, code, headers, etc.).
+   * Call prepareTypeHtml(el) BEFORE unhiding the block to avoid a content flash.
+   * Returns a cancellable promise like typeText().
+   */
+  function prepareTypeHtml(el) {
+    // Collect all text nodes and empty them BEFORE the block is made visible
+    const textNodes = [];
+    const hiddenContainers = new Set();
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.textContent.length > 0) {
+        // Find the closest structural container (li, tr, pre) to hide
+        let container = null;
+        let p = node.parentNode;
+        while (p && p !== el) {
+          const tag = p.tagName;
+          if (tag === "LI" || tag === "TR" || tag === "PRE") { container = p; break; }
+          p = p.parentNode;
+        }
+        textNodes.push({ node: node, fullText: node.textContent, container: container });
+        if (container && !hiddenContainers.has(container)) {
+          hiddenContainers.add(container);
+          container.style.display = "none";
+        }
+      }
+    }
+    textNodes.forEach(t => { t.node.textContent = ""; });
+    return textNodes;
+  }
+
+  function typeHtml(el, charDelay, preparedNodes) {
+    let cancelled = false;
+    let resolvePromise;
+
+    // Use pre-collected text nodes if available, otherwise collect now
+    const textNodes = preparedNodes || (() => {
+      const nodes = [];
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+      let node;
+      while ((node = walker.nextNode())) {
+        if (node.textContent.length > 0) {
+          nodes.push({ node: node, fullText: node.textContent, container: null });
+        }
+      }
+      nodes.forEach(t => { t.node.textContent = ""; });
+      return nodes;
+    })();
+
+    // Helper: restore all hidden containers
+    function restoreContainers() {
+      textNodes.forEach(t => {
+        if (t.container) t.container.style.display = "";
+      });
+    }
+
+    // Add a typing cursor — place at el initially (first container may be hidden)
+    const cursor = document.createElement("span");
+    cursor.className = "typing-cursor";
+    el.appendChild(cursor);
+
+    const promise = new Promise((resolve) => {
+      resolvePromise = resolve;
+      let tIdx = 0; // current text node index
+      let cIdx = 0; // current char index within text node
+
+      function revealNext() {
+        if (cancelled) {
+          // Restore all text and containers instantly
+          textNodes.forEach(t => { t.node.textContent = t.fullText; });
+          restoreContainers();
+          if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
+          resolve();
+          return;
+        }
+
+        // Find next text node that still has chars to reveal
+        while (tIdx < textNodes.length && cIdx >= textNodes[tIdx].fullText.length) {
+          tIdx++;
+          cIdx = 0;
+        }
+
+        if (tIdx >= textNodes.length) {
+          // All done - remove cursor
+          if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
+          resolve();
+          return;
+        }
+
+        const tn = textNodes[tIdx];
+
+        // Reveal the container (li, tr) when we start typing its first character
+        if (cIdx === 0 && tn.container && tn.container.style.display === "none") {
+          tn.container.style.display = "";
+        }
+
+        // Reveal one more character
+        cIdx++;
+        tn.node.textContent = tn.fullText.substring(0, cIdx);
+
+        // Move cursor after current text node
+        if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
+        tn.node.parentNode.insertBefore(cursor, tn.node.nextSibling);
+
+        scrollToBottom();
+        playTimer = setTimeout(revealNext, charDelay);
+      }
+
+      revealNext();
+    });
+
+    promise.cancel = () => {
+      cancelled = true;
+      if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+      textNodes.forEach(t => { t.node.textContent = t.fullText; });
+      restoreContainers();
+      if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
+      if (resolvePromise) resolvePromise();
+    };
+
+    return promise;
+  }
+
+  // =====================================================
+  // NAVIGATION & REVEAL
+  // =====================================================
 
   function applyTurnHighlight(activeTurnIdx) {
-    // Mark turns: visible (past), active (current), hidden (future)
     document.querySelectorAll(".turn").forEach((el, i) => {
-      el.classList.remove("active", "visible");
-      if (i < activeTurnIdx) {
-        el.classList.add("visible");
-      } else if (i === activeTurnIdx) {
-        el.classList.add("visible", "active");
+      el.classList.remove("active");
+      if (i <= activeTurnIdx) {
+        el.classList.add("revealed");
+      }
+      if (i === activeTurnIdx) {
+        el.classList.add("active");
       }
     });
 
-    // Move glow to the current block only
-    document.querySelectorAll(".active-block").forEach(el => el.classList.remove("active-block"));
+    // Also reveal any bookmark dividers for revealed turns
+    document.querySelectorAll(".bookmark-divider").forEach(el => {
+      const forTurn = parseInt(el.dataset.forTurn);
+      const turnIdx = turns.findIndex(t => t.index === forTurn);
+      if (turnIdx >= 0 && turnIdx <= activeTurnIdx) {
+        el.classList.add("revealed");
+      }
+    });
 
-    // Apply per-turn colored margin bar to .turn elements
     document.querySelectorAll(".turn").forEach((el, i) => {
       const colors = turnColorMap[i];
       if (!colors) {
@@ -1221,7 +1505,6 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
         el.style.borderLeftColor = colors.faded;
         el.style.boxShadow = "";
       } else if (i === activeTurnIdx) {
-        el.classList.add("active-block");
         el.style.borderLeftColor = colors.full;
         el.style.boxShadow = "-4px 0 10px " + colors.glow;
       } else {
@@ -1231,37 +1514,275 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
     });
   }
 
-  function scrollToTurn(turnIdx) {
-    // Lightweight highlight update triggered by scroll — no scrollIntoView
-    const seg = turnSegments.find(s => s.turnIdx === turnIdx);
-    if (!seg) return;
-    currentBlock = seg.startBlock;
-    applyTurnHighlight(turnIdx);
-    updateProgress();
+  /** Instantly reveal all blocks up to and including blockIdx */
+  function revealUpTo(blockIdx) {
+    for (let i = 0; i <= blockIdx && i < allBlocks.length; i++) {
+      const b = allBlocks[i];
+      // Reveal the turn
+      b.turnEl.classList.add("revealed");
+      // Reveal block content
+      b.el.classList.remove("block-hidden");
+      // If it's a user block, fill in the markdown content instantly
+      if (b.kind === "user" && b.userTextEl) {
+        b.userTextEl.innerHTML = renderMd(b.rawText);
+      }
+      // If it's an assistant-text block, restore full rendered HTML
+      if (b.kind === "assistant-text" && b.textEl && b.rawText) {
+        b.textEl.innerHTML = renderMd(b.rawText);
+      }
+    }
+    if (blockIdx > revealedUpTo) revealedUpTo = blockIdx;
   }
 
+  /** Hide all blocks after blockIdx */
+  function hideAfter(blockIdx) {
+    for (let i = blockIdx + 1; i < allBlocks.length; i++) {
+      const b = allBlocks[i];
+      b.el.classList.add("block-hidden");
+      // Hide the turn if no blocks in it are revealed
+      const turnHasRevealed = allBlocks.some(
+        (ab, j) => j <= blockIdx && ab.turnIdx === b.turnIdx
+      );
+      if (!turnHasRevealed) {
+        b.turnEl.classList.remove("revealed", "active");
+      }
+      // Reset user text
+      if (b.kind === "user" && b.userTextEl) {
+        b.userTextEl.textContent = "";
+      }
+      // Reset assistant text to full rendered HTML (hidden by block-hidden anyway)
+      if (b.kind === "assistant-text" && b.textEl && b.rawText) {
+        b.textEl.innerHTML = renderMd(b.rawText);
+      }
+    }
+    // Hide bookmark dividers after
+    document.querySelectorAll(".bookmark-divider").forEach(el => {
+      const forTurn = parseInt(el.dataset.forTurn);
+      const turnIdx = turns.findIndex(t => t.index === forTurn);
+      const lastRevealedTurn = allBlocks[blockIdx] ? allBlocks[blockIdx].turnIdx : -1;
+      if (turnIdx > lastRevealedTurn) {
+        el.classList.remove("revealed");
+      }
+    });
+    revealedUpTo = blockIdx;
+  }
+
+  let lastScrollTime = 0;
+  function scrollToBottom(force) {
+    // Throttle: skip if called within 150ms (unless forced)
+    const now = Date.now();
+    if (!force && now - lastScrollTime < 150) return;
+    lastScrollTime = now;
+
+    // Find the target element to keep visible
+    let target = document.querySelector(".typing-cursor");
+    const isTyping = !!target;
+    if (!target) {
+      const activeTurn = document.querySelector(".turn.revealed.active");
+      if (activeTurn) {
+        const visibleBlocks = activeTurn.querySelectorAll(
+          ".block-wrapper:not(.block-hidden), .thinking-block:not(.block-hidden), .tool-group:not(.block-hidden), .tool-block:not(.block-hidden), .assistant-header:not(.block-hidden), .user-msg"
+        );
+        target = visibleBlocks[visibleBlocks.length - 1];
+      }
+      if (!target) {
+        target = document.querySelector(".turn.revealed.active") ||
+                 document.querySelector(".turn.revealed:last-child");
+      }
+    }
+    if (!target) return;
+
+    // Get the controls bar height to avoid scrolling behind it
+    const controlsBar = document.querySelector(".controls");
+    const barH = controlsBar ? controlsBar.offsetHeight : 0;
+    const safeBottom = window.innerHeight - barH - 48;
+
+    const rect = target.getBoundingClientRect();
+    // Only scroll if the target is below the safe zone
+    if (rect.bottom > safeBottom) {
+      const scrollY = window.pageYOffset + rect.bottom - safeBottom;
+      // Use instant scroll during typing to prevent bounce from competing animations
+      window.scrollTo({ top: scrollY, behavior: isTyping ? "instant" : "smooth" });
+    }
+  }
+
+  /** Go to a specific block index - instantly reveals everything up to it */
   function goTo(idx) {
     if (idx < 0) idx = 0;
     if (idx >= allBlocks.length) idx = allBlocks.length - 1;
+
+    // Cancel any in-progress typing
+    cancelAnimation();
+
     currentBlock = idx;
+    revealUpTo(idx);
+    hideAfter(idx);
 
     const activeTurnIdx = allBlocks[idx] ? allBlocks[idx].turnIdx : -1;
     applyTurnHighlight(activeTurnIdx);
+    updateProgress();
+    scrollToBottom();
+  }
 
-    // Scroll active block into view
-    if (allBlocks[idx]) {
-      programmaticScroll = true;
-      allBlocks[idx].el.scrollIntoView({ behavior: "smooth", block: "center" });
-      setTimeout(() => { programmaticScroll = false; }, 800);
+  function cancelAnimation() {
+    animState = STATE_IDLE;
+    if (typingCancel) {
+      typingCancel();
+      typingCancel = null;
+    }
+    if (playTimer) {
+      clearTimeout(playTimer);
+      playTimer = null;
+    }
+  }
+
+  // =====================================================
+  // ANIMATED PLAYBACK STATE MACHINE
+  // =====================================================
+
+  async function animatedTick() {
+    if (!playing) return;
+    if (currentBlock >= allBlocks.length - 1) { stop(); return; }
+
+    const nextIdx = currentBlock + 1;
+    const nextBlock = allBlocks[nextIdx];
+    const prevTurnIdx = allBlocks[currentBlock] ? allBlocks[currentBlock].turnIdx : -1;
+    const nextTurnIdx = nextBlock.turnIdx;
+
+    // If entering a new turn, add a pause
+    if (nextTurnIdx !== prevTurnIdx && currentBlock >= 0) {
+      animState = STATE_PAUSING;
+      // Show the turn container
+      nextBlock.turnEl.classList.add("revealed", "active");
+      applyTurnHighlight(nextTurnIdx);
+
+      // Also reveal bookmark
+      document.querySelectorAll(".bookmark-divider").forEach(el => {
+        const forTurn = parseInt(el.dataset.forTurn);
+        const turnIdx = turns.findIndex(t => t.index === forTurn);
+        if (turnIdx === nextTurnIdx) el.classList.add("revealed");
+      });
+
+      await delay(Math.max(200, 600 / speed));
+      if (!playing) return;
     }
 
-    updateProgress();
+    currentBlock = nextIdx;
+
+    if (ANIMATE_MODE && nextBlock.kind === "user" && nextBlock.userTextEl && nextBlock.rawText) {
+      // TYPEWRITER for user prompts
+      animState = STATE_TYPING_USER;
+      nextBlock.turnEl.classList.add("revealed", "active");
+      applyTurnHighlight(nextTurnIdx);
+      scrollToBottom();
+
+      // Brief pause so user sees the empty prompt area before typing begins
+      await delay(Math.max(200, 400 / speed));
+      if (!playing) return;
+
+      // Ensure clearly visible typing: minimum 1.5s at 1x speed, base 50ms/char
+      const minDuration = Math.max(800, 1500 / speed);
+      const rawLen = nextBlock.rawText.length;
+      const charDelay = Math.max(20, Math.max(50 / speed, minDuration / Math.max(rawLen, 1)));
+      const typePromise = typeText(nextBlock.userTextEl, nextBlock.rawText, charDelay);
+      typingCancel = typePromise.cancel;
+
+      await typePromise;
+      typingCancel = null;
+      if (!playing) return;
+
+      revealedUpTo = nextIdx;
+      updateProgress();
+      scrollToBottom();
+
+      // Brief pause after typing before showing response
+      await delay(Math.max(100, 400 / speed));
+      if (!playing) return;
+
+    } else if (ANIMATE_MODE && nextBlock.kind === "assistant-text" && nextBlock.textEl && nextBlock.rawText) {
+      // TYPEWRITER for assistant response text
+      animState = STATE_TYPING_ASSISTANT;
+      // Empty text nodes BEFORE unhiding to prevent full-content flash
+      const preparedNodes = prepareTypeHtml(nextBlock.textEl);
+      nextBlock.el.classList.remove("block-hidden");
+      nextBlock.turnEl.classList.add("revealed", "active");
+      applyTurnHighlight(nextTurnIdx);
+      scrollToBottom();
+
+      // Brief pause before typing begins
+      await delay(Math.max(100, 200 / speed));
+      if (!playing) return;
+
+      // Calculate char delay: faster than user typing since responses are longer
+      // Target ~2s at 1x for a 200-char block, minimum 5ms/char, base 15ms/char
+      const rawLen = nextBlock.rawText.length;
+      const totalChars = Math.max(rawLen, 1);
+      const minDuration = Math.max(500, 1000 / speed);
+      const maxDuration = Math.max(2000, 4000 / speed);
+      const targetDuration = Math.min(maxDuration, Math.max(minDuration, (totalChars * 15) / speed));
+      const charDelay = Math.max(3, targetDuration / totalChars);
+
+      const typePromise = typeHtml(nextBlock.textEl, charDelay, preparedNodes);
+      typingCancel = typePromise.cancel;
+
+      await typePromise;
+      typingCancel = null;
+      if (!playing) return;
+
+      revealedUpTo = nextIdx;
+      updateProgress();
+      scrollToBottom();
+
+      // Brief pause after response before next block
+      await delay(Math.max(50, 200 / speed));
+      if (!playing) return;
+
+    } else {
+      // REVEAL tool/thinking/other blocks with animation (instant)
+      animState = STATE_REVEALING_BLOCKS;
+      nextBlock.el.classList.remove("block-hidden");
+      nextBlock.turnEl.classList.add("revealed", "active");
+      applyTurnHighlight(nextTurnIdx);
+
+      revealedUpTo = nextIdx;
+      updateProgress();
+      scrollToBottom();
+
+      // Delay between blocks
+      const blockDelay = nextBlock.kind === "assistant-header" ? Math.max(30, 100 / speed)
+                       : nextBlock.kind === "tool" ? Math.max(80, 400 / speed)
+                       : nextBlock.kind === "thinking" ? Math.max(60, 300 / speed)
+                       : Math.max(100, 800 / speed);
+      await delay(blockDelay);
+      if (!playing) return;
+    }
+
+    animState = STATE_IDLE;
+    // Continue to next
+    animatedTick();
   }
 
-  function stepNext() {
-    if (currentBlock < allBlocks.length - 1) goTo(currentBlock + 1);
-    else stop();
+  function delay(ms) {
+    return new Promise(resolve => {
+      playTimer = setTimeout(resolve, ms);
+    });
   }
+
+  // =====================================================
+  // NON-ANIMATED (classic) PLAYBACK
+  // =====================================================
+
+  function classicTick() {
+    if (!playing) return;
+    if (currentBlock >= allBlocks.length - 1) { stop(); return; }
+    goTo(currentBlock + 1);
+    const d = Math.max(100, 1500 / speed);
+    playTimer = setTimeout(classicTick, d);
+  }
+
+  // =====================================================
+  // TURN NAVIGATION
+  // =====================================================
 
   function stepNextTurn() {
     if (turnSegments.length === 0) return;
@@ -1272,31 +1793,26 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
         return;
       }
     }
-    // Already at last turn — go to last block
     goTo(allBlocks.length - 1);
   }
 
   function stepPrevTurn() {
     if (turnSegments.length === 0) return;
     const curTurnIdx = allBlocks[currentBlock] ? allBlocks[currentBlock].turnIdx : -1;
-    // Find the segment for the current turn
     let curSeg = null;
     for (const seg of turnSegments) {
       if (seg.turnIdx === curTurnIdx) { curSeg = seg; break; }
     }
-    // If we're past the first block of the current turn, jump to its start
     if (curSeg && currentBlock > curSeg.startBlock) {
       goTo(curSeg.startBlock);
       return;
     }
-    // Otherwise jump to the start of the previous turn
     for (let i = turnSegments.length - 1; i >= 0; i--) {
       if (turnSegments[i].turnIdx < curTurnIdx) {
         goTo(turnSegments[i].startBlock);
         return;
       }
     }
-    // Already at first turn — go to first block
     goTo(0);
   }
 
@@ -1304,21 +1820,17 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
     if (playing) return;
     playing = true;
     document.getElementById("btn-play").innerHTML = "&#x23F8;";
-    tick();
+    if (ANIMATE_MODE) {
+      animatedTick();
+    } else {
+      classicTick();
+    }
   }
 
   function stop() {
     playing = false;
     document.getElementById("btn-play").innerHTML = "&#x25B6;";
-    if (playTimer) { clearTimeout(playTimer); playTimer = null; }
-  }
-
-  function tick() {
-    if (!playing) return;
-    if (currentBlock >= allBlocks.length - 1) { stop(); return; }
-    stepNext();
-    const delay = Math.max(100, 1500 / speed);
-    playTimer = setTimeout(tick, delay);
+    cancelAnimation();
   }
 
   function togglePlay() {
@@ -1327,13 +1839,11 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 
   // --- Progress bar ---
   function updateProgress() {
-    // Update per-turn segment fills
     const activeTurnIdx = allBlocks[currentBlock] ? allBlocks[currentBlock].turnIdx : -1;
     for (const seg of turnSegments) {
       if (seg.turnIdx < activeTurnIdx) {
         seg.fillEl.style.width = "100%";
       } else if (seg.turnIdx === activeTurnIdx) {
-        // How far within this turn's blocks
         const posInTurn = currentBlock - seg.startBlock + 1;
         const pct = (posInTurn / seg.blockCount) * 100;
         seg.fillEl.style.width = pct + "%";
@@ -1342,7 +1852,6 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
       }
     }
 
-    // Time display
     if (turns.length > 0 && turns[0].timestamp && turns[turns.length - 1].timestamp) {
       const startMs = new Date(turns[0].timestamp).getTime();
       const endMs = new Date(turns[turns.length - 1].timestamp).getTime();
@@ -1360,15 +1869,13 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
     }
   }
 
-  // Helper: map an x position on the progress bar to a block index via segments
   function progressPctToBlock(pct) {
     if (turnSegments.length === 0) return Math.round(pct * (allBlocks.length - 1));
-    // Walk segments to find which one the pct falls into
     let cumWidth = 0;
     for (const seg of turnSegments) {
       const segWidth = seg.blockCount / allBlocks.length;
       if (pct <= cumWidth + segWidth) {
-        const within = (pct - cumWidth) / segWidth; // 0..1 within segment
+        const within = (pct - cumWidth) / segWidth;
         const blockInSeg = Math.round(within * (seg.blockCount - 1));
         return seg.startBlock + blockInSeg;
       }
@@ -1452,7 +1959,6 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
 
   // --- Initialize ---
   async function init() {
-    // Decode data
     const turnsRaw = "/*TURNS_DATA*/";
     const bookmarksRaw = "/*BOOKMARKS_DATA*/";
 
@@ -1500,48 +2006,22 @@ body.in-iframe .bar-title::after { content: " \2197"; font-size: 9px; }
     syncFilters();
     setSpeed(speed);
 
-    // --- Scroll-based turn detection ---
-    const turnEls = document.querySelectorAll(".turn");
-    if (turnEls.length > 0) {
-      let scrollTick = false;
-      window.addEventListener("scroll", () => {
-        if (scrollTick || programmaticScroll || playing) return;
-        scrollTick = true;
-        requestAnimationFrame(() => {
-          scrollTick = false;
-          const vpMid = window.innerHeight / 2;
-          let best = -1;
-          let bestDist = Infinity;
-          turnEls.forEach((el, i) => {
-            const rect = el.getBoundingClientRect();
-            // If this turn spans the viewport center, it wins immediately
-            if (rect.top <= vpMid && rect.bottom >= vpMid) {
-              best = i;
-              bestDist = -1; // sentinel: exact hit
-              return;
-            }
-            // Otherwise find closest turn above viewport center (just scrolled past)
-            if (bestDist === -1) return; // already have an exact hit
-            if (rect.bottom <= vpMid) {
-              const dist = vpMid - rect.bottom;
-              if (dist < bestDist) { bestDist = dist; best = i; }
-            }
-            // Or closest turn below viewport center (scrolling up)
-            if (rect.top > vpMid) {
-              const dist = rect.top - vpMid;
-              if (dist < bestDist) { bestDist = dist; best = i; }
-            }
-          });
-          const curTurnIdx = allBlocks[currentBlock] ? allBlocks[currentBlock].turnIdx : -1;
-          if (best !== -1 && best !== curTurnIdx) {
-            scrollToTurn(best);
-          }
-        });
-      }, { passive: true });
+    if (allBlocks.length > 0) {
+      if (ANIMATE_MODE) {
+        // In animate mode, start paused at block -1
+        // Show the first turn container so user sees the prompt area on load
+        currentBlock = -1;
+        const firstBlock = allBlocks[0];
+        if (firstBlock) {
+          firstBlock.turnEl.classList.add("revealed", "active");
+          applyTurnHighlight(firstBlock.turnIdx);
+        }
+        updateProgress();
+      } else {
+        // Classic mode: reveal first block instantly
+        goTo(0);
+      }
     }
-
-    // Start at first block
-    if (allBlocks.length > 0) goTo(0);
   }
 
   init();
