@@ -10,6 +10,49 @@ Adapted from [claude-replay](https://github.com/es617/claude-replay) (MIT) for C
 
 <a href="https://dataprofessor.github.io/cortex-replay/"><img src="screencast.gif" alt="Cortex Replay Screencast"></a>
 
+## Cortex Code Skill
+
+If you use [Cortex Code](https://docs.snowflake.com/en/user-guide/cortex-code/cortex-code), you can install cortex-replay as a skill. This lets you generate replays directly from a conversation by just asking for one, with no terminal needed.
+
+The skill uses a bundled Python script (`skill/scripts/replay.py`) with no external dependencies. Python 3 is the only requirement.
+
+### Install the skill
+
+```bash
+cortex skill add https://github.com/dataprofessor/cortex-replay
+```
+
+Restart Cortex Code after installing to activate the skill.
+
+### Use the skill
+
+Once installed, just ask Cortex Code to create a replay:
+
+```
+create a replay of my last session
+```
+
+```
+replay session 6868f059 with tokyo-night theme
+```
+
+```
+create a replay of turns 3-15 at 2x speed with thinking hidden
+```
+
+Cortex Code will run the bundled script, write the HTML file to your working directory, and open it automatically.
+
+### Skill structure
+
+```
+skill/
+  SKILL.md          # Skill definition loaded by Cortex Code
+  scripts/
+    replay.py       # Self-contained Python script (stdlib only)
+```
+
+---
+
 ## Getting Started
 
 **Requirements:** Node.js 18+
