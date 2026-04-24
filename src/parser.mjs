@@ -1,13 +1,14 @@
 /**
  * Parse Cortex Code JSON session files into structured turns.
  *
- * Cortex Code stores sessions as single JSON files with a `history` array,
- * unlike Claude Code which uses JSONL. This parser handles the format
- * differences: nested tool_use/tool_result wrappers, internalOnly flags,
+ * Cortex Code stores session metadata in a `.json` file and history in a
+ * separate `.history.jsonl` sidecar file (one message per line). This parser
+ * handles both the sidecar format and the legacy embedded `history` array,
+ * along with nested tool_use/tool_result wrappers, internalOnly flags,
  * system-reminder filtering, and user_sent_time timestamps.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 /**
  * @typedef {{ tool_use_id: string, name: string, input: object, result: string|null, resultTimestamp: string|null, status: string|null }} ToolCall
@@ -217,7 +218,19 @@ export function parseSession(filePath) {
     working_directory: session.working_directory || null,
   };
 
-  const history = session.history || [];
+  let history = session.history || [];
+
+  // New format: history stored in a separate .history.jsonl sidecar file
+  if (history.length === 0) {
+    const jsonlPath = filePath.replace(/\.json$/, ".history.jsonl");
+    if (existsSync(jsonlPath)) {
+      history = readFileSync(jsonlPath, "utf-8")
+        .split("\n")
+        .filter(Boolean)
+        .map(line => JSON.parse(line));
+    }
+  }
+
   const turns = [];
   let i = 0;
   let turnIndex = 0;

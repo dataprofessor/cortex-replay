@@ -105,7 +105,7 @@ function readSessionInfo(filePath) {
       title: (data.title || "(untitled)").replace(/<[^>]+>/g, "").trim() || "(untitled)",
       created_at: data.created_at || "",
       last_updated: data.last_updated || "",
-      turns: Array.isArray(data.history) ? data.history.filter(h => h.role === "user").length : 0,
+      turns: Array.isArray(data.history) ? data.history.filter(h => h.role === "user").length : Math.floor((data.history_length || 0) / 2),
       file: filePath,
     };
   } catch {
